@@ -1,0 +1,12 @@
+server:
+  port: 9001
+
+spring:
+  application:
+    name: user-servide
+eureka:
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+    server-url:
+      defaultZone: http://localhost:8761/eureka
