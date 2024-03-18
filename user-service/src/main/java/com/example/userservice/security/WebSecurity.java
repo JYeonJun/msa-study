@@ -37,9 +37,11 @@ public class WebSecurity {
 //                                .requestMatchers(new AntPathRequestMatcher("/users/**")).permitAll()
 //                .requestMatchers(new AntPathRequestMatcher("/**")).permitAll());
         http.authorizeHttpRequests((authz) -> authz
-                                .requestMatchers("/**").access(
-                                        new WebExpressionAuthorizationManager("hasIpAddress('127.0.0.1') or hasIpAddress('192.168.0.5')"))
-                                .anyRequest().authenticated()
+                        .requestMatchers("/actuator/**").permitAll()
+                        .requestMatchers("/**").access(
+                                new WebExpressionAuthorizationManager(
+                                        "hasIpAddress('127.0.0.1') or hasIpAddress('192.168.0.5')"))
+                        .anyRequest().authenticated()
                 )
                 .authenticationManager(authenticationManager)
                 .sessionManagement((session) -> session
