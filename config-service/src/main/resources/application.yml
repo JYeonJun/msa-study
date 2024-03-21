@@ -3,8 +3,25 @@ server:
 spring:
   application:
     name: config-server
+  profiles:
+    active: native
+  rabbitmq:
+    host: 127.0.0.1
+    port: 5672
+    username: guest
+    password: guest
   cloud:
     config:
       server:
+        native:
+          search-locations: file://${user.home}/Documents/studyProject/msa-native-file-repo
         git:
-          uri: file:///Users/jeong-yeonjun/Documents/studyProject/msa study/git-local-repo
+#          uri: file:///Users/jeong-yeonjun/Documents/studyProject/msa-git-local-repo
+          uri: https://github.com/JYeonJun/msa-spring-cloud-config.git
+#          username: [my username] # ?? ? ????? ?? ??? private? ?? ?? ??
+#          password: [my password] # ?? ? ????? ?? ??? private? ?? ?? ??
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, busrefresh
