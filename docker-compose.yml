@@ -1,0 +1,16 @@
+version: '3.1' # 사용할 Docker Compose 파일 버전
+
+services:
+  mariadb: # 서비스 이름
+    image: mariadb # 사용할 이미지
+    restart: always
+    environment: # 환경 변수 설정
+      MYSQL_ROOT_PASSWORD: mariadb1234 # root 사용자의 비밀번호 설정
+      TZ: Asia/Seoul
+    ports:
+      - "3307:3306" # 호스트와 컨테이너 간의 포트 매핑
+    volumes:
+      - mariadb_data:/var/lib/mysql # 데이터 저장을 위한 볼륨 마운트
+
+volumes:
+  mariadb_data: # 볼륨 정의
