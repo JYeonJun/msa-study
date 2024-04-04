@@ -17,7 +17,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class KafkaConsumer {
 
-    CatalogRepository repository;
+    private final CatalogRepository repository;
 
     @KafkaListener(topics = "example-order-topic")
     public void processMessage(String kafkaMessage) {
