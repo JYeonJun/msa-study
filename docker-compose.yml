@@ -1,16 +1,201 @@
 version: '3.1' # 사용할 Docker Compose 파일 버전
 
 services:
-  mariadb: # 서비스 이름
-    image: mariadb # 사용할 이미지
+  mariadb:
+    image: mariadb
     restart: always
-    environment: # 환경 변수 설정
-      MYSQL_ROOT_PASSWORD: mariadb1234 # root 사용자의 비밀번호 설정
+    environment:
+      MYSQL_ROOT_PASSWORD: mariadb1234
+      MYSQL_DATABASE: mydb
       TZ: Asia/Seoul
     ports:
-      - "3307:3306" # 호스트와 컨테이너 간의 포트 매핑
+      - 3307:3306
     volumes:
-      - mariadb_data:/var/lib/mysql # 데이터 저장을 위한 볼륨 마운트
+      - mariadb_data:/var/lib/mysql
+    networks:
+      - ecommerce-network
+
+  rabbitmq:
+    image: rabbitmq:management
+    container_name: rabbitmq
+    ports:
+      - 15672:15672
+      - 5672:5672
+      - 15671:15671
+      - 5671:5671
+      - 4369:4369
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - ecommerce-network
+
+  config-service:
+    image: jeongyeonjun/config-service # Docker Hub에서 이미지를 가져오거나, 로컬에서 빌드된 이미지를 사용
+    build:
+      context: ./config-service # Dockerfile이 위치한 디렉토리 경로, 이미지를 로컬에서 빌드할 경우 사용
+    container_name: config-service
+    ports:
+      - 8888:8888 # 필요한 포트 매핑
+    environment:
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_PROFILES_ACTIVE: default
+    networks:
+      - ecommerce-network
+    depends_on:
+      - rabbitmq
+
+  discovery-service:
+    image: jeongyeonjun/discovery-service # Docker Hub에서 이미지를 가져오거나, 로컬에서 빌드된 이미지를 사용
+    build:
+      context: ./discoveryservice # Dockerfile이 위치한 디렉토리 경로, 이미지를 로컬에서 빌드할 경우 사용
+    container_name: discovery-service
+    ports:
+      - 8761:8761 # 필요한 포트 매핑
+    environment:
+      SPRING_CLOUD_CONFIG_URI: http://config-service:8888
+    networks:
+      - ecommerce-network
+    depends_on:
+      - config-service
+      - rabbitmq
+
+  apigateway-service:
+    image: jeongyeonjun/apigateway-service
+    build:
+      context: ./apigateway-service
+    container_name: apigateway-service
+    ports:
+      - 8000:8000
+    environment:
+      SPRING_CLOUD_CONFIG_URI: http://config-service:8888
+      SPRING_RABBITMQ_HOST: rabbitmq
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
+    networks:
+      - ecommerce-network
+    depends_on:
+      - config-service
+      - discovery-service
+      - rabbitmq
+
+  zookeeper:
+    image: wurstmeister/zookeeper
+    container_name: zookeeper
+    ports:
+      - 2181:2181
+    networks:
+      ecommerce-network:
+        ipv4_address: 172.31.0.100
+
+  kafka:
+    image: wurstmeister/kafka
+    container_name: kafka
+    ports:
+      - 9092:9092
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: 172.31.0.101
+      KAFKA_CREATE_TOPICS: "Topic:1:1"
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - zookeeper
+    networks:
+      ecommerce-network:
+        ipv4_address: 172.31.0.101
+
+  zipkin:
+    image: openzipkin/zipkin
+    container_name: zipkin
+    ports:
+      - 9411:9411
+    networks:
+      - ecommerce-network
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    ports:
+      - 9090:9090
+    volumes:
+      - /Users/jeong-yeonjun/Documents/studyProject/msa study/prometheus-2.48.1.darwin-amd64/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - ecommerce-network
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - 3000:3000
+    networks:
+      - ecommerce-network
+
+  user-service:
+    image: jeongyeonjun/user-service # 사용할 이미지
+    build:
+      context: ./user-service
+    container_name: user-service
+    environment:
+      SPRING_CLOUD_CONFIG_URI: http://config-service:8888
+      SPRING_RABBITMQ_HOST: rabbitmq
+      # SPRING_ZIPKIN_BASE_URL: http://zipkin:9411
+      MANAGEMENT_TRACING_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
+      LOGGING_FILE: /api-logs/users-ws.log
+    networks:
+      - ecommerce-network
+    depends_on:
+      - config-service
+      - rabbitmq
+      - discovery-service
+      - zipkin
+
+  order-service:
+    image: jeongyeonjun/order-service # 사용할 이미지
+    build:
+      context: ./order-service
+    container_name: order-service
+    environment:
+      SPRING_CLOUD_CONFIG_URI: http://config-service:8888
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_ZIPKIN_BASE_URL: http://zipkin:9411
+      # MANAGEMENT_TRACING_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
+      SPRING_DATASOURCE_URL: jdbc:mariadb://mariadb:3306/mydb
+      LOGGING_FILE: /api-logs/orders-ws.log
+    networks:
+      - ecommerce-network
+    depends_on:
+      - config-service
+      - rabbitmq
+      - discovery-service
+      - mariadb
+      - zipkin
+
+  catalog-service:
+    image: jeongyeonjun/catalog-service # 이미지 이름 (빌드 후 이미지 태그)
+    build:
+      context: ./catalog-service # Dockerfile이 위치한 디렉토리 경로
+    container_name: catalog-service
+    environment:
+      SPRING_CLOUD_CONFIG_URI: http://config-service:8888
+      SPRING_RABBITMQ_HOST: rabbitmq
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/ # Eureka 서버 주소
+      LOGGING_FILE: /api-logs/catalogs-ws.log # 로깅 파일 경로
+    networks:
+      - ecommerce-network # 사용할 네트워크 이름
+    depends_on:
+      - discovery-service # 의존하는 서비스
 
 volumes:
-  mariadb_data: # 볼륨 정의
+  mariadb_data:
+
+
+networks:
+  ecommerce-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.31.0.0/16
+          gateway: 172.31.0.1

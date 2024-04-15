@@ -40,7 +40,8 @@ public class WebSecurity {
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/**").access(
                                 new WebExpressionAuthorizationManager(
-                                        "hasIpAddress('127.0.0.1') or hasIpAddress('192.168.0.5')"))
+//                                        "hasIpAddress('127.0.0.1') or hasIpAddress('192.168.0.5')"))
+                                        "hasIpAddress('127.0.0.1') or hasIpAddress('192.168.0.5') or hasIpAddress('172.31.0.0/16')"))
                         .anyRequest().authenticated()
                 )
                 .authenticationManager(authenticationManager)
